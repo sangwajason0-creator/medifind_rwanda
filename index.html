@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFind Rwanda</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #eef2f7; }
+        header { background: #0a7cff; color: white; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; }
+        nav { background: white; padding: 10px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); sticky; top:0; z-index:100; }
+        nav button { margin: 5px; padding: 10px 15px; border: none; background: #0a7cff; color: white; border-radius: 20px; cursor: pointer; }
+        section { display: none; padding: 20px; max-width: 800px; margin: auto; }
+        .active { display: block; }
+        .card { display: flex; gap: 15px; background: white; padding: 15px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); align-items: center; }
+        .card img { width: 60px; height: 60px; }
+        .card-info h3 { margin: 0; color: #0a7cff; }
+        input { padding: 10px; width: 80%; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        .whatsapp-btn { background: #25D366; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+
+<header>MediFind Rwanda</header>
+<nav>
+    <button onclick="show('home')">Home</button>
+    <button onclick="show('search')">Search</button>
+    <button onclick="show('all')">All Medicines</button>
+    <button onclick="show('admin')">Admin</button>
+</nav>
+
+<section id="home" class="active">
+    <h2>Welcome to MediFind Rwanda</h2>
+    <p>Loading database from your Google Sheet...</p>
+</section>
+
+<section id="search">
+    <h2>Search Medicine</h2>
+    <input id="searchBox" placeholder="Enter medicine name...">
+    <button onclick="searchMedicine()" style="padding:10px; background:#0a7cff; color:white; border:none; border-radius:5px;">Search</button>
+    <div id="results"></div>
+</section>
+
+<section id="all">
+    <h2>All Medicines</h2>
+    <div id="allMedicines">Loading...</div>
+</section>
+
+<section id="admin">
+    <h2>Admin Login</h2>
+    <input type="password" id="adminPass" placeholder="Password">
+    <button onclick="adminLogin()">Login</button>
+    <div id="adminPanel"></div>
+</section>
+
+<div class="footer">Contact: 0785657358 | Email: sangwajason0@gmail.com</div>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+let medicines = [];
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT21vsLkZ2PCAULyB6Rw-1iVNi--1bOUP3bqUB1AevrvIJdGoy3vS3nm1jCzJK6SIFO5qa091VW_a5c/pub?gid=0&single=true&output=csv";
+
+function show(id) {
+    document.querySelectorAll("section").forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+function fetchCSV() {
+    Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            // Auto-detect columns to avoid header errors
+            medicines = results.data.map(row => {
+                const keys = Object.keys(row);
+                const getVal = (terms) => {
+                    const k = keys.find(key => terms.some(t => key.toLowerCase().includes(t)));
+                    return k ? row[k].trim() : "";
+                };
+                return {
+                    medicine: getVal(['med', 'item']),
+                    pharmacy: getVal(['phar', 'shop']),
+                    price: getVal(['pri', 'cost']),
+                    location: getVal(['loc', 'add']),
+                    contact: getVal(['cont', 'phon', 'tel'])
+                };
+            }).filter(m => m.medicine && m.pharmacy);
+            displayAll();
+        },
+        error: function(err) {
+            document.getElementById("allMedicines").innerHTML = "Error loading data. Check if Sheet is Published to Web as CSV.";
+        }
+    });
+}
+
+function createCard(m) {
+    let phone = m.contact.replace(/\D/g, '');
+    if (phone.startsWith('07')) phone = '250' + phone.substring(1);
+    const mapUrl = `https://www.google.com/maps/search/${encodeURIComponent(m.location + " Rwanda")}`;
+
+    return `
+        <div class="card">
+            <img src="https://cdn-icons-png.flaticon.com/512/2966/2966485.png">
+            <div class="card-info">
+                <h3>${m.medicine}</h3>
+                <p><b>Pharmacy:</b> ${m.pharmacy}</p>
+                <p><b>Price:</b> ${m.price} RWF</p>
+                <p><b>Location:</b> ${m.location}</p>
+                <a href="${mapUrl}" target="_blank" style="color:#0a7cff; text-decoration:none; font-size:13px;">📍 View Map</a><br><br>
+                <button class="whatsapp-btn" onclick="window.open('https://wa.me/${phone}')">WhatsApp</button>
+            </div>
+        </div>
+    `;
+}
+
+function displayAll() {
+    const div = document.getElementById("allMedicines");
+    div.innerHTML = medicines.length ? medicines.map(m => createCard(m)).join('') : "No medicines found in sheet.";
+}
+
+function searchMedicine() {
+    const q = document.getElementById("searchBox").value.toLowerCase();
+    const filtered = medicines.filter(m => m.medicine.toLowerCase().includes(q));
+    document.getElementById("results").innerHTML = filtered.map(m => createCard(m)).join('') || "No results.";
+}
+
+function adminLogin() {
+    if(document.getElementById("adminPass").value === "abanabacu") {
+        document.getElementById("adminPanel").innerHTML = "<p>Login Success. Messages would appear here.</p>";
+    } else { alert("Wrong password"); }
+}
+
+window.onload = fetchCSV;
+</script>
+</body>
+</html>
